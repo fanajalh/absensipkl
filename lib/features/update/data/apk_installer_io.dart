@@ -41,6 +41,27 @@ abstract final class ApkInstaller {
     await _channel.invokeMethod<void>('openInstallPermissionSettings');
   }
 
+  static Future<Directory> _resolveReadableUpdatesDir() async {
+    try {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        final dir = Directory('${extDir.path}/updates');
+        if (!dir.existsSync()) {
+          await dir.create(recursive: true);
+        }
+        return dir;
+      }
+    } catch (_) {
+      // Fallback to temporary directory below
+    }
+    final cacheDir = await getTemporaryDirectory();
+    final dir = Directory('${cacheDir.path}/updates');
+    if (!dir.existsSync()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
   static Future<DownloadedApk> downloadApk({
     required String url,
     required String fileName,
@@ -53,12 +74,7 @@ abstract final class ApkInstaller {
       );
     }
 
-    final cacheDir = await getTemporaryDirectory();
-    final updatesDir = Directory('${cacheDir.path}/updates');
-    if (!updatesDir.existsSync()) {
-      await updatesDir.create(recursive: true);
-    }
-
+    final updatesDir = await _resolveReadableUpdatesDir();
     final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final targetFile = File('${updatesDir.path}/$safeName');
     if (targetFile.existsSync()) {
@@ -69,7 +85,9 @@ abstract final class ApkInstaller {
     IOSink? sink;
     try {
       final request = http.Request('GET', Uri.parse(url))
-        ..headers['Accept'] = 'application/octet-stream';
+        ..followRedirects = true
+        ..maxRedirects = 8
+        ..headers['User-Agent'] = 'AbsensiPKL-Android-Updater/1.0';
       final response = await client.send(request);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
@@ -79,12 +97,16 @@ abstract final class ApkInstaller {
 
       final totalBytes = response.contentLength ?? 0;
       var receivedBytes = 0;
+      List<int>? firstFourBytes;
 
       sink = targetFile.openWrite();
       final digestSink = _SingleDigestSink();
       final shaInput = sha256.startChunkedConversion(digestSink);
 
       await for (final chunk in response.stream) {
+        if (firstFourBytes == null && chunk.length >= 4) {
+          firstFourBytes = chunk.sublist(0, 4);
+        }
         sink.add(chunk);
         shaInput.add(chunk);
         receivedBytes += chunk.length;
@@ -95,6 +117,22 @@ abstract final class ApkInstaller {
       await sink.close();
       sink = null;
       shaInput.close();
+
+      // Validate ZIP/APK magic header (PK\x03\x04) and minimum realistic size
+      final isValidZipHeader = firstFourBytes != null &&
+          firstFourBytes.length >= 4 &&
+          firstFourBytes[0] == 0x50 &&
+          firstFourBytes[1] == 0x4B &&
+          firstFourBytes[2] == 0x03 &&
+          firstFourBytes[3] == 0x04;
+      if (!isValidZipHeader || receivedBytes < 1024 * 1024) {
+        if (targetFile.existsSync()) {
+          await targetFile.delete();
+        }
+        throw const FormatException(
+          'File unduhan bukan paket APK yang valid. Silakan coba lagi.',
+        );
+      }
 
       final digest = digestSink.value.toString().toLowerCase();
 

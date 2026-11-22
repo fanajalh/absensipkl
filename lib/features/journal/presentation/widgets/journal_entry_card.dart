@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/extensions/date_time_ext.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_media_attachment_field.dart';
 import '../../domain/entities/journal_entry.dart';
 import 'validation_status_badge.dart';
 
@@ -16,10 +20,25 @@ class JournalEntryCard extends StatelessWidget {
   final JournalEntry entry;
   final VoidCallback onTap;
 
+  Uint8List? _decodeDataUrl(String? raw) {
+    if (raw == null || !raw.startsWith('data:image/')) return null;
+    final commaIdx = raw.indexOf(',');
+    if (commaIdx <= 0) return null;
+    try {
+      return base64Decode(raw.substring(commaIdx + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final rawPhoto = entry.photoUrl?.trim();
+    final hasPhoto = rawPhoto != null && rawPhoto.isNotEmpty;
+    final decodedBytes = _decodeDataUrl(rawPhoto);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -75,6 +94,66 @@ class JournalEntryCard extends StatelessWidget {
                 height: 1.45,
               ),
             ),
+            if (hasPhoto) ...<Widget>[
+              const SizedBox(height: AppSpacing.sm + 2),
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => showAttachmentPreviewDialog(
+                  context,
+                  title: entry.title,
+                  fileName: 'Foto Bukti',
+                  bytes: decodedBytes,
+                  sourceUrl: rawPhoto,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : const Color(0xFFF4F8FC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: colorScheme.outline,
+                      width: AppSpacing.hairlineBorder,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (decodedBytes != null) ...<Widget>[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.memory(
+                            decodedBytes,
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ] else ...<Widget>[
+                        Icon(
+                          Icons.photo_outlined,
+                          size: 16,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        'Lihat Foto',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             if (entry.mentorNote != null &&
                 entry.mentorNote!.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.md),

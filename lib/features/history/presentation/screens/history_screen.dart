@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/date_time_ext.dart';
 import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_empty_character.dart';
 import '../../../../core/widgets/app_error_view.dart';
+import '../../../../core/widgets/character_refresh_indicator.dart';
 import '../../../../core/widgets/motion_widgets.dart';
 import '../../../attendance/domain/entities/attendance_record.dart';
 import '../../../auth/presentation/notifiers/auth_notifier.dart';
@@ -48,7 +50,7 @@ class HistoryScreen extends ConsumerWidget {
                 ? HistoryFilter.all
                 : viewState.filter;
 
-            return RefreshIndicator.adaptive(
+            return CharacterRefreshIndicator(
               onRefresh: () => ref.read(historyProvider.notifier).refresh(),
               child: Align(
                 alignment: Alignment.topCenter,
@@ -169,7 +171,7 @@ class HistoryScreen extends ConsumerWidget {
                                   'empty-${viewState.filter.name}',
                                 ),
                                 width: double.infinity,
-                                padding: const EdgeInsets.all(AppSpacing.xl),
+                                padding: const EdgeInsets.all(AppSpacing.lg),
                                 decoration: BoxDecoration(
                                   color: colorScheme.surface,
                                   borderRadius: BorderRadius.circular(
@@ -180,9 +182,12 @@ class HistoryScreen extends ConsumerWidget {
                                     width: AppSpacing.hairlineBorder,
                                   ),
                                 ),
-                                child: const Text(
-                                  'Belum ada catatan presensi untuk filter ini.',
-                                  textAlign: TextAlign.center,
+                                child: const AppEmptyCharacter(
+                                  message:
+                                      'Belum ada catatan presensi untuk filter ini.',
+                                  assetPath:
+                                      'assets/illustrations/undraw_checkin.svg',
+                                  imageHeight: 96,
                                 ),
                               )
                             : KeyedSubtree(

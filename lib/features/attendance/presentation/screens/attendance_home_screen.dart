@@ -8,6 +8,7 @@ import '../../../../core/errors/app_error.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_error_view.dart';
+import '../../../../core/widgets/character_refresh_indicator.dart';
 import '../../../../core/widgets/motion_widgets.dart';
 import '../../../auth/presentation/notifiers/auth_notifier.dart';
 import '../../../auth/presentation/notifiers/auth_state.dart';
@@ -76,7 +77,7 @@ class AttendanceHomeScreen extends ConsumerWidget {
                 ? dashboard.approvedJournalsCount
                 : localApproved;
 
-            return RefreshIndicator.adaptive(
+            return CharacterRefreshIndicator(
               onRefresh: () =>
                   ref.read(attendanceProvider.notifier).refreshLocation(),
               child: Align(

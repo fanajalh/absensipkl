@@ -33,7 +33,7 @@ class AppHeaderBackButton extends StatelessWidget {
             padding: const EdgeInsets.only(left: 7, right: 11),
             decoration: BoxDecoration(
               color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: colorScheme.outline,
                 width: AppSpacing.hairlineBorder,
@@ -126,7 +126,7 @@ class AppHeaderActionButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: icon != null ? 12 : 14),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(10),
             border: borderColor == Colors.transparent
                 ? null
                 : Border.all(

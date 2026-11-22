@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/extensions/date_time_ext.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_media_attachment_field.dart';
 import '../../domain/entities/leave_approval_status.dart';
 import '../../domain/entities/leave_request.dart';
 import 'leave_status_pill.dart';
@@ -17,6 +21,17 @@ class LeaveRequestCard extends StatelessWidget {
 
   final LeaveRequest request;
   final bool highlight;
+
+  Uint8List? _decodeDataUrl(String? raw) {
+    if (raw == null || !raw.startsWith('data:image/')) return null;
+    final commaIdx = raw.indexOf(',');
+    if (commaIdx <= 0) return null;
+    try {
+      return base64Decode(raw.substring(commaIdx + 1));
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +48,10 @@ class LeaveRequestCard extends StatelessWidget {
         ? (isDark ? AppColors.darkSurfaceSoft : AppColors.lightSurfaceSoft)
         : colorScheme.surface;
 
+    final rawAttachment = request.attachmentName?.trim();
+    final hasAttachment = rawAttachment != null && rawAttachment.isNotEmpty;
+    final decodedBytes = _decodeDataUrl(rawAttachment);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -45,61 +64,102 @@ class LeaveRequestCard extends StatelessWidget {
                 width: AppSpacing.hairlineBorder,
               ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  request.reason,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${request.type.label} $dateText (${request.totalDays} hari)',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontFeatures: const <FontFeature>[
-                      FontFeature.tabularFigures(),
-                    ],
-                  ),
-                ),
-                if (request.attachmentName != null &&
-                    request.attachmentName!.trim().isNotEmpty) ...<Widget>[
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: <Widget>[
-                      Icon(
-                        Icons.attach_file_rounded,
-                        size: 14,
-                        color: colorScheme.onSurfaceVariant,
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      request.reason,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          request.attachmentName!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '${request.type.label} $dateText (${request.totalDays} hari)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontFeatures: const <FontFeature>[
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              LeaveStatusPill(status: request.status),
+            ],
+          ),
+          if (hasAttachment) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm + 2),
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => showAttachmentPreviewDialog(
+                context,
+                title: 'Lampiran ${request.type.label}',
+                fileName: 'Lampiran',
+                bytes: decodedBytes,
+                sourceUrl: rawAttachment,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.white.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: colorScheme.outline,
+                    width: AppSpacing.hairlineBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (decodedBytes != null) ...<Widget>[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.memory(
+                          decodedBytes,
+                          width: 22,
+                          height: 22,
+                          fit: BoxFit.cover,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                    ] else ...<Widget>[
+                      Icon(
+                        Icons.photo_outlined,
+                        size: 16,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 6),
                     ],
-                  ),
-                ],
-              ],
+                    Text(
+                      'Lihat Foto',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          LeaveStatusPill(status: request.status),
+          ],
         ],
       ),
     );

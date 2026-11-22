@@ -12,8 +12,10 @@ import '../../../../core/services/camera_datasource.dart';
 import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_empty_character.dart';
 import '../../../../core/widgets/app_error_view.dart';
-import '../../../../core/widgets/app_header_buttons.dart';
+import '../../../../core/widgets/app_media_attachment_field.dart';
+import '../../../../core/widgets/character_refresh_indicator.dart';
 import '../../../../core/widgets/motion_widgets.dart';
 import '../../../auth/presentation/notifiers/auth_notifier.dart';
 import '../../domain/entities/leave_approval_status.dart';
@@ -37,7 +39,7 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
   LeaveType _selectedType = LeaveType.sakit;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
-  String? _attachmentName;
+  CapturedSelfie? _attachment;
   bool _isSubmitting = false;
   String? _feedbackMessage;
   bool _feedbackIsError = false;
@@ -71,25 +73,6 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
     });
   }
 
-  Future<void> _attachSupportingPhoto() async {
-    FocusScope.of(context).unfocus();
-    try {
-      final captured = await ref
-          .read(cameraDatasourceProvider)
-          .captureJournalPhoto(fromGallery: false);
-      if (!mounted || captured == null) return;
-      setState(() {
-        _attachmentName = captured.fileName;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _feedbackIsError = true;
-        _feedbackMessage = AppErrorMapper.fromObject(error).userMessage;
-      });
-    }
-  }
-
   Future<void> _submit() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
@@ -107,7 +90,7 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
       startDate: _startDate,
       endDate: _endDate,
       reason: _reasonController.text.trim(),
-      attachmentName: _attachmentName,
+      attachmentName: _attachment?.storageValue,
       status: LeaveApprovalStatus.submitted,
       submittedAt: DateTime.now(),
     );
@@ -119,7 +102,7 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
       _reasonController.clear();
       setState(() {
         _isSubmitting = false;
-        _attachmentName = null;
+        _attachment = null;
         _feedbackIsError = false;
         _feedbackMessage = 'Pengajuan berhasil dikirim ke pembimbing.';
       });
@@ -145,14 +128,18 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSpacing.maxContentWidth,
-            ),
-            child: ListView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: CharacterRefreshIndicator(
+          onRefresh: () async => ref.invalidate(leaveProvider),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppSpacing.maxContentWidth,
+              ),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.lg,
                 AppSpacing.md,
@@ -160,27 +147,12 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
                 AppSpacing.xl + bottomInset,
               ),
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Izin & Sakit',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    AppHeaderActionButton(
-                      key: AppWidgetKeys.leaveSubmitButton,
-                      label: _isSubmitting ? 'Mengirim' : 'Kirim',
-                      icon: Icons.send_rounded,
-                      isPrimary: true,
-                      isLoading: _isSubmitting,
-                      trailingPadding: false,
-                      onPressed: _isSubmitting ? null : _submit,
-                    ),
-                  ],
+                Text(
+                  'Izin & Sakit',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 FadeSlideIn(
@@ -364,45 +336,51 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
                             ],
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(left: AppSpacing.lg),
-                          child: Divider(
-                            height: AppSpacing.hairlineBorder,
-                            thickness: AppSpacing.hairlineBorder,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.md,
-                          ),
-                          child: Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(
-                                  _attachmentName ?? 'Lampiran Surat',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              TextButton(
-                                onPressed: _isSubmitting
-                                    ? null
-                                    : _attachSupportingPhoto,
-                                child: Text(
-                                  _attachmentName == null ? 'Foto' : 'Ubah',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppMediaAttachmentField(
+                  title: 'Lampiran',
+                  attachment: _attachment,
+                  enabled: !_isSubmitting,
+                  isLeaveDocument: true,
+                  onChanged: (next) {
+                    setState(() {
+                      _attachment = next;
+                    });
+                  },
+                  onError: (msg) {
+                    setState(() {
+                      _feedbackIsError = true;
+                      _feedbackMessage = msg;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.icon(
+                  key: AppWidgetKeys.leaveSubmitButton,
+                  onPressed: _isSubmitting ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded, size: 18),
+                  label: Text(_isSubmitting ? 'Mengirim' : 'Kirim'),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 Text(
@@ -425,15 +403,21 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
                   ),
                   data: (requests) {
                     if (requests.isEmpty) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.lg,
-                        ),
-                        child: Text(
-                          'Belum ada pengajuan.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                      return Container(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
+                          border: Border.all(
+                            color: colorScheme.outline,
+                            width: AppSpacing.hairlineBorder,
                           ),
+                        ),
+                        child: const AppEmptyCharacter(
+                          message: 'Belum ada pengajuan.',
+                          assetPath: 'assets/illustrations/undraw_izin.svg',
+                          imageHeight: 92,
                         ),
                       );
                     }
@@ -458,6 +442,7 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 3D Bottom Lip Shadow (Duolingo Tactile Base) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0C68B5" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <!-- Main Sky Blue Face -->
+    <item android:bottom="5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#29AAFF"
+                android:endColor="#138CEB"
+                android:type="linear" />
+            <corners android:radius="24dp" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#5FC2FF" />
+        </shape>
+    </item>
+</layer-list>

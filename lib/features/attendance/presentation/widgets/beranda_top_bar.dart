@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/character_refresh_indicator.dart';
 
 /// Concise Orisale v4 top bar for Beranda with avatar, announcements & map.
 class BerandaTopBar extends StatelessWidget {
@@ -114,11 +115,7 @@ class BerandaTopBar extends StatelessWidget {
           padding: EdgeInsets.zero,
           onPressed: isRefreshing ? null : onRefreshTap,
           icon: isRefreshing
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                )
+              ? const SpinningCharacterLoader(size: 24)
               : Icon(
                   Icons.refresh_rounded,
                   size: 20,

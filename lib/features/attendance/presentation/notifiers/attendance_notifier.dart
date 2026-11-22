@@ -256,13 +256,13 @@ class AttendanceNotifier extends _$AttendanceNotifier {
               location: geofence.location,
               distanceMeters: geofence.distanceMeters,
               allowedRadiusMeters: placement.allowedRadiusMeters,
-              selfieLabel: selfie.fileName,
+              selfieLabel: selfie.storageValue,
             )
           : await repo.submitCheckIn(
               location: geofence.location,
               distanceMeters: geofence.distanceMeters,
               allowedRadiusMeters: placement.allowedRadiusMeters,
-              selfieLabel: selfie.fileName,
+              selfieLabel: selfie.storageValue,
               workStartTime: placement.workStartTime,
             );
 

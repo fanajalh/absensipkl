@@ -12,6 +12,7 @@ import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_header_buttons.dart';
+import '../../../../core/widgets/app_media_attachment_field.dart';
 import '../../domain/entities/journal_entry.dart';
 import '../../domain/entities/journal_validation_status.dart';
 import '../notifiers/journal_notifier.dart';
@@ -39,8 +40,7 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 17, minute: 0);
-  String? _photoUrl;
-  Uint8List? _photoBytes;
+  CapturedSelfie? _attachment;
   JournalEntry? _editingEntry;
   bool _initialized = false;
   bool _isSaving = false;
@@ -69,7 +69,10 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
         _descriptionController.text = entry.description;
         _startTime = _parseTimeOfDay(entry.startTime) ?? _startTime;
         _endTime = _parseTimeOfDay(entry.endTime) ?? _endTime;
-        _photoUrl = entry.photoUrl;
+        _attachment = CapturedSelfie.fromSavedValue(
+          entry.photoUrl,
+          defaultPrefix: 'jurnal',
+        );
         break;
       }
     }
@@ -119,26 +122,6 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
     });
   }
 
-  Future<void> _pickPhoto({required bool fromGallery}) async {
-    FocusScope.of(context).unfocus();
-    try {
-      final captured = await ref
-          .read(cameraDatasourceProvider)
-          .captureJournalPhoto(fromGallery: fromGallery);
-      if (!mounted || captured == null) return;
-      setState(() {
-        _photoUrl = captured.fileName;
-        _photoBytes = captured.bytes;
-        _submitError = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _submitError = AppErrorMapper.fromObject(error).userMessage;
-      });
-    }
-  }
-
   Future<void> _save() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
@@ -161,7 +144,7 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
       startTime: _formatTimeOfDay(_startTime),
       endTime: _formatTimeOfDay(_endTime),
       status: _editingEntry?.status ?? JournalValidationStatus.pending,
-      photoUrl: _photoUrl,
+      photoUrl: _attachment?.storageValue,
       mentorNote: _editingEntry?.mentorNote,
     );
 
@@ -185,7 +168,6 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
     _hydrateIfEditing(entries);
 
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final isEditMode = _editingEntry != null;
 
@@ -318,105 +300,24 @@ class _JournalFormScreenState extends ConsumerState<JournalFormScreen> {
                           },
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusSm),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: <Widget>[
-                              Row(
-                                children: <Widget>[
-                                  if (_photoBytes != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        _photoBytes!,
-                                        width: 40,
-                                        height: 40,
-                                        fit: BoxFit.cover,
-                                        cacheWidth: 120,
-                                      ),
-                                    )
-                                  else
-                                    Icon(
-                                      Icons.photo_camera_outlined,
-                                      size: 20,
-                                      color: colorScheme.primary,
-                                    ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Expanded(
-                                    child: Text(
-                                      _photoUrl ?? 'Foto Bukti (Opsional)',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  if (_photoUrl != null)
-                                    IconButton(
-                                      tooltip: 'Hapus foto',
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      onPressed: _isSaving
-                                          ? null
-                                          : () => setState(() {
-                                                _photoUrl = null;
-                                                _photoBytes = null;
-                                              }),
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        size: 18,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Row(
-                                children: <Widget>[
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      key: AppWidgetKeys
-                                          .journalCameraPhotoButton,
-                                      onPressed: _isSaving
-                                          ? null
-                                          : () =>
-                                              _pickPhoto(fromGallery: false),
-                                      icon: const Icon(
-                                        Icons.camera_alt_outlined,
-                                        size: 16,
-                                      ),
-                                      label: const Text('Kamera'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      key: AppWidgetKeys
-                                          .journalGalleryPhotoButton,
-                                      onPressed: _isSaving
-                                          ? null
-                                          : () =>
-                                              _pickPhoto(fromGallery: true),
-                                      icon: const Icon(
-                                        Icons.photo_library_outlined,
-                                        size: 16,
-                                      ),
-                                      label: const Text('Galeri'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                        AppMediaAttachmentField(
+                          title: 'Foto Bukti',
+                          attachment: _attachment,
+                          enabled: !_isSaving,
+                          isLeaveDocument: false,
+                          cameraButtonKey:
+                              AppWidgetKeys.journalCameraPhotoButton,
+                          galleryButtonKey:
+                              AppWidgetKeys.journalGalleryPhotoButton,
+                          onChanged: (next) {
+                            setState(() {
+                              _attachment = next;
+                              _submitError = null;
+                            });
+                          },
+                          onError: (msg) {
+                            setState(() => _submitError = msg);
+                          },
                         ),
                         const SizedBox(height: AppSpacing.xl),
                         FilledButton(

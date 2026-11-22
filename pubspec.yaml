@@ -1,7 +1,7 @@
 name: absensi_pkl
 description: "Aplikasi Absensi Digital Siswa PKL (PT fanajalh.id)"
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.7.0
@@ -26,6 +26,7 @@ dependencies:
   package_info_plus: ^10.2.2
   path_provider: ^2.1.6
   crypto: ^3.0.8
+  camera: ^0.12.0+2
 
 dev_dependencies:
   flutter_test:

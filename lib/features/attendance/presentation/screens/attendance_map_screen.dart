@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/errors/app_error.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/services/location_datasource.dart';
+import '../../../../core/services/plus_code_helper.dart';
 import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -53,10 +54,11 @@ class AttendanceMapScreen extends ConsumerWidget {
     final (String statusTitle, String badgeText, Color accent, Color bgColor) =
         _resolveSummary(evaluation, isDark);
 
-    final latText =
-        (evaluation?.location.latitude ?? placement.latitude).toStringAsFixed(5);
-    final lngText = (evaluation?.location.longitude ?? placement.longitude)
-        .toStringAsFixed(5);
+    final standardAddress = PlusCodeHelper.formatStandardAddress(
+      latitude: placement.latitude,
+      longitude: placement.longitude,
+      address: placement.address,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -166,7 +168,9 @@ class AttendanceMapScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '$latText, $lngText (Batas ${placement.allowedRadiusMeters.round()} m)',
+                                    '$standardAddress (Batas ${placement.allowedRadiusMeters.round()} m)',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontFeatures: const <FontFeature>[

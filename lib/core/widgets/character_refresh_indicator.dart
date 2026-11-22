@@ -1,0 +1,223 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+/// Custom Pull-to-Refresh indicator styled with ONLY the spinning character head.
+class CharacterRefreshIndicator extends StatefulWidget {
+  const CharacterRefreshIndicator({
+    super.key,
+    required this.onRefresh,
+    required this.child,
+  });
+
+  final Future<void> Function() onRefresh;
+  final Widget child;
+
+  @override
+  State<CharacterRefreshIndicator> createState() =>
+      _CharacterRefreshIndicatorState();
+}
+
+class _CharacterRefreshIndicatorState extends State<CharacterRefreshIndicator>
+    with SingleTickerProviderStateMixin {
+  static const double _triggerDistance = 64.0;
+  static const double _maxDrag = 110.0;
+
+  late final AnimationController _spinController;
+  double _dragOffset = 0.0;
+  bool _isRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+  }
+
+  @override
+  void dispose() {
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (_isRefreshing) return false;
+    if (notification.depth != 0) return false;
+
+    if (notification is OverscrollNotification) {
+      if (notification.overscroll < 0 && notification.dragDetails != null) {
+        final next =
+            (_dragOffset - notification.overscroll * 0.55).clamp(0.0, _maxDrag);
+        if (next != _dragOffset) {
+          setState(() => _dragOffset = next);
+        }
+      }
+    } else if (notification is ScrollUpdateNotification) {
+      if (notification.metrics.pixels < 0) {
+        final next =
+            (-notification.metrics.pixels * 0.75).clamp(0.0, _maxDrag);
+        if (next != _dragOffset) {
+          setState(() => _dragOffset = next);
+        }
+      } else if (_dragOffset > 0 && notification.metrics.pixels > 0) {
+        setState(() => _dragOffset = 0.0);
+      }
+    } else if (notification is ScrollEndNotification) {
+      _handleRelease();
+    }
+    return false;
+  }
+
+  void _handleRelease() {
+    if (_isRefreshing || _dragOffset <= 0) return;
+
+    if (_dragOffset >= _triggerDistance) {
+      unawaited(_triggerRefresh());
+    } else {
+      setState(() => _dragOffset = 0.0);
+    }
+  }
+
+  Future<void> _triggerRefresh() async {
+    if (_isRefreshing) return;
+    unawaited(HapticFeedback.mediumImpact());
+    setState(() {
+      _isRefreshing = true;
+      _dragOffset = _triggerDistance;
+    });
+    _spinController.repeat();
+
+    final minSpin = Future<void>.delayed(const Duration(milliseconds: 520));
+    try {
+      await Future.wait<void>(<Future<void>>[
+        widget.onRefresh(),
+        minSpin,
+      ]);
+    } finally {
+      if (mounted) {
+        _spinController.stop();
+        _spinController.reset();
+        setState(() {
+          _isRefreshing = false;
+          _dragOffset = 0.0;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_dragOffset / _triggerDistance).clamp(0.0, 1.0);
+    final isVisible = _isRefreshing || _dragOffset > 2.0;
+
+    return Listener(
+      onPointerUp: (_) => _handleRelease(),
+      onPointerCancel: (_) => _handleRelease(),
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: <Widget>[
+          NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: widget.child,
+          ),
+          if (isVisible)
+            Positioned(
+              top: _isRefreshing
+                  ? 14.0
+                  : (-42.0 + progress * 56.0).clamp(-42.0, 22.0),
+              child: IgnorePointer(
+                child: AnimatedScale(
+                  scale: _isRefreshing ? 1.0 : (0.68 + progress * 0.32),
+                  duration: const Duration(milliseconds: 120),
+                  child: _isRefreshing
+                      ? RotationTransition(
+                          turns: _spinController,
+                          child: const _CharacterHeadOnly(size: 42),
+                        )
+                      : Transform.rotate(
+                          angle: progress * math.pi * 2.0,
+                          child: const _CharacterHeadOnly(size: 42),
+                        ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reusable spinning character head loader (face only, zero background/border).
+class SpinningCharacterLoader extends StatefulWidget {
+  const SpinningCharacterLoader({
+    super.key,
+    this.size = 40,
+  });
+
+  final double size;
+
+  @override
+  State<SpinningCharacterLoader> createState() =>
+      _SpinningCharacterLoaderState();
+}
+
+class _SpinningCharacterLoaderState extends State<SpinningCharacterLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: _CharacterHeadOnly(size: widget.size),
+    );
+  }
+}
+
+class _CharacterHeadOnly extends StatelessWidget {
+  const _CharacterHeadOnly({required this.size});
+
+  final double size;
+
+  static const String _svgData =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="125 145 525 475" fill="none" shape-rendering="auto">'
+      '<path d="M396 164.8a224.8 224.8 0 0 1 104.8 42.4c6.2 4.9 12.5 9.4 18 15a225.4 225.4 0 0 1 71.8 149 58.5 58.5 0 0 1 50.9 42.2 71 71 0 0 1-27.6 76.5c-11 7.7-24.5 12-38 11.7-5 0-10-1.6-15-1.8-1.9 2.2-3.3 4.9-4.8 7.3A223.3 223.3 0 0 1 389 609.8c-11 .7-21.9 2-33 .7a223.7 223.7 0 0 1-178.8-342.3A223.4 223.4 0 0 1 352 163.5c14.6-1.4 29.4-.3 44 1.3Z" fill="#000"/>'
+      '<path fill-rule="evenodd" clip-rule="evenodd" d="M498.8 213.2A216 216 0 0 0 363 169c-13-.2-26.2 1.6-39 4a218 218 0 0 0-113.6 365.5 218.5 218.5 0 0 0 260.4 40.2c35-18.8 64.2-47.3 84.4-81.5l-3-1.6c-2.8-1.4-5.7-3-8-5-2.2-2-.3-5.8 2.7-4.7 1.5.7 3 1.6 4.4 2.4a55 55 0 0 0 59.6-3.6 64.5 64.5 0 0 0 25-69.8 53.1 53.1 0 0 0-24-31 52.6 52.6 0 0 0-47-2.8c-1.6.8-3.4 1.5-5 1.3-2.5-.2-2.8-4.2-.6-5.2 8-4 16.5-5.6 25.4-6.4a217 217 0 0 0-72-146.4c-4.4-4-8.7-8.1-13.9-11.3Zm107.6 196.2c2-1.2 1.3-5.1-1.4-5-2 0-4.2.8-6.2 1.6l-1.4.4a95.1 95.1 0 0 0-25.5 12.4c-2.2 2-2.2 4.4.1 6.2a92 92 0 0 0 5.2 2.8 36 36 0 0 1 13 9.2c-.2 1.9-2 3.4-3.4 4.5l-.2.2c-3.9 3-8.8 5-13.6 7-2.5 1-4.9 2-7.1 3.1-1.7.8-2.6 2.2-1.6 3.9 1 2 3.2 1.1 5 .5l.6-.2 5.4-2.3c5.4-2.3 11-4.5 15.4-8 2.7-2.1 5.1-5.1 5.4-8.7-.5-3.4-2.7-5.7-5.3-7.8a83 83 0 0 0-11.6-7.2l-1.1-.6c5.4-3 10.8-5.6 16.6-7.7l5-1.7a52 52 0 0 0 6.7-2.6Z" fill="#ecad80"/>'
+      '<g transform="translate(-161 -83)"><path d="M590 433c11.8 7 21 17.6 26.7 30 5.9-3.1 11.6-6.7 17.6-9.6 1.8-1 4.4.5 4 2.6.2 1.5-2 2.5-3 3.2l-16.4 9a65.7 65.7 0 0 1-39.4 82.3A65.9 65.9 0 0 1 501 523c-6-9.9-9.3-21.4-9.3-33a64.8 64.8 0 0 1 53.3-64.8c15.2-3 31.6 0 45 7.9Z" fill="#000"/><path d="M549.2 430.3a59.7 59.7 0 0 1 67.2 59.7 59.5 59.5 0 1 1-67.2-59.7Z" fill="#fff"/><path d="M390 447a55 55 0 1 1-55.7 38.6l-11.3-4.5c-2-.8-4-1.4-5.4-3-.4-2.5.8-4 3.2-3.7 5.2 1.3 10 4.2 15.2 5.6 1.4-1.7 2.2-3.8 3.3-5.7A55 55 0 0 1 390 447Z" fill="#000"/><path d="M376.5 453.7a49.3 49.3 0 1 1 20.8 96.4 49.3 49.3 0 0 1-20.8-96.4Z" fill="#fff"/><path d="M578.3 465.4a24.9 24.9 0 0 1 27.9 24.6c-.4 4.8-1.8 9.7-4.6 13.6a24.6 24.6 0 0 1-18.6 10.6c-8.2.5-16.4-3.3-21.2-10-6-8-6.3-19.8-.6-28a24.7 24.7 0 0 1 17-10.8ZM408.4 478.5a23 23 0 0 1 19.7 7.5c4 4.4 6 10 5.7 16 0 12-10.7 22.8-22.8 22.3a23 23 0 0 1-22.9-22.3 22.8 22.8 0 0 1 20.3-23.5Z" fill="#000"/></g>'
+      '<g transform="translate(-161 -83)"><path d="M607 397.6c1.5-.4 3.2.6 4.7 1 0 1.2-.1 2.4-.4 3.6-1.6 1.5-3.6 2.6-5.4 3.8a803.6 803.6 0 0 1-70.4 40.6A289.9 289.9 0 0 1 500 462a50 50 0 0 1-21 3.5c-3.3-.4-6.2-3-6.2-6.5 0-4.2 3-8.6 5-12.1 1.3-2.7 4.5-3 7-4.1l111.7-41.5c3.5-1.2 7-2.8 10.5-3.7ZM339 432.6l90 18c2.3.4 4.6.1 6.9.5 2.4 2.3 3.6 6.2 4.5 9.4 1.2 4-.1 8.8-4 11-4 2.6-9.8 2.1-14.4 1.9-8.8-1-17.4-3.8-25.7-6.8a418 418 0 0 1-57-27c-1.6-.9-3.6-1.9-4.8-3.5-.3-2.9 1.9-4.1 4.5-3.5Z" fill="#000"/></g>'
+      '<g transform="translate(-161 -83)"><path d="M580 568.7c2.4 1 2 3.4 1.4 5.4a92 92 0 0 1-28.4 34 96.5 96.5 0 0 1-60 17.5c-26.8-1-53-12-73.4-29.3-.4-2.4-.5-3.7 1.4-5.4 51.8-7.1 106.8-15 159-22.2Z" fill="#000"/><path d="M573.9 575.5c-8.2 15-21 27.5-36.4 35a89.2 89.2 0 0 1-40.5 9.2c-24.7.2-49-9-68.6-23.9 48-6.6 97.8-13.8 145.5-20.3Z" fill="#8F2E45"/></g>'
+      '<g transform="translate(-161 -83)"><g fill="#000"><path d="M546 236.8a220 220 0 0 1 141.8 52.3 189.7 189.7 0 0 1 60.4 97.9c5.5 21.9 6.6 44.4 4.3 66.8-.4 1.8-.5 5.6-3 5.6-4.2.2-8.5 0-12.7 1.2a64.9 64.9 0 0 0-31.2 17c-1 1-2 2.2-3.6 1.8-1.6 0-2.3-2-2.1-3.4.3-3 1.5-6 2.1-9 1.6-6.7 1.9-13.2 2.5-20 .6-6.8-.3-13.3-.9-20-.4-3.8-1.2-7.3-2-11a54.2 54.2 0 0 1-26.5-7c-15.8-9-27.3-25-35.5-40.8-9.8-19-16-40-20.2-60.8a441.8 441.8 0 0 1-91.2 25.9 561.7 561.7 0 0 1-101.2 9 386 386 0 0 1-71.2-6c-2-.4-3.5-1.1-3.6-3.3 1-3.8 4-7.3 6.5-10.3 9-11 19-21 29.9-30.1A242 242 0 0 1 546 236.8Z"/><path d="M718.6 474.6c0 1 .3 2.7-.5 3.5-2.2 2.4-5.1 4.2-7.6 6.4-2.6 2.2-4.8 4.9-7.5 6.9-2.7.5-4-2-2.7-4.1 2.7-3.8 6.7-6.8 10.2-9.8 2.7-2 4.5-4.7 8-3Z"/></g><path d="M520.2 243.8c41.3-4.2 83.5 2.8 120.8 21.2a194.1 194.1 0 0 1 79.2 70.7 181 181 0 0 1 26.4 118 68 68 0 0 0-38.6 14c2.8-16.5 3.5-33.4 0-49.8-.7-2.4-1.2-5.3-2.8-7.1-1.6-1.2-4.3-.8-6.2-1-8 .2-16-2.8-22.9-7a87.5 87.5 0 0 1-27.6-30.3 211 211 0 0 1-22.2-60.5c-.8-3.3-1.1-6.8-2.3-10-.9-1.4-2.4-1.8-4-1.2-3.6 1.3-7.1 3-10.7 4.3a443.8 443.8 0 0 1-82.3 22.5 588.4 588.4 0 0 1-81 8.7c-14.6.2-29.4.4-44-.4-14.3-1-28.4-2.4-42.5-4.8a232.8 232.8 0 0 1 160.7-87.3Z" fill="#1e293b"/></g>'
+      '</svg>';
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: SvgPicture.string(
+        _svgData,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+}

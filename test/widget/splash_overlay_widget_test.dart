@@ -1,18 +1,17 @@
 import 'package:absensi_pkl/core/theme/app_theme.dart';
 import 'package:absensi_pkl/core/widgets/app_splash_overlay.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'AppSplashOverlay renders brand identity and smoothly dismisses to child',
+    'AppSplashOverlay renders icon-only zoom-out/zoom-in splash and smoothly dismisses to child',
     (tester) async {
       tester.view.physicalSize = const Size(375, 812);
       tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -27,13 +26,12 @@ void main() {
       );
 
       await tester.pump(const Duration(milliseconds: 80));
-      expect(find.text('Absensi PKL'), findsOneWidget);
-      expect(find.text('PT fanajalh.id'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 150));
       await tester.pumpAndSettle();
 
-      expect(find.text('Absensi PKL'), findsNothing);
+      expect(find.byType(SvgPicture), findsNothing);
       expect(find.text('Main App Ready'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },

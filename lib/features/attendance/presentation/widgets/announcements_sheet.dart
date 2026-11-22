@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/extensions/date_time_ext.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_empty_character.dart';
 import '../../domain/entities/announcement.dart';
 
 /// Concise bottom sheet listing announcements from `/siswa/home`.
@@ -39,15 +40,10 @@ class AnnouncementsSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             if (announcements.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                child: Text(
-                  'Belum ada pengumuman.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
+              const AppEmptyCharacter(
+                message: 'Belum ada pengumuman.',
+                assetPath: 'assets/illustrations/undraw_onboarding.svg',
+                imageHeight: 92,
               )
             else
               for (var i = 0; i < announcements.length; i++) ...<Widget>[

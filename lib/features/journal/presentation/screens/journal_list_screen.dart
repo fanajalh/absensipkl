@@ -6,7 +6,9 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/testing/app_widget_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_empty_character.dart';
 import '../../../../core/widgets/app_error_view.dart';
+import '../../../../core/widgets/character_refresh_indicator.dart';
 import '../../../../core/widgets/motion_widgets.dart';
 import '../../../auth/presentation/notifiers/auth_notifier.dart';
 import '../../domain/entities/journal_validation_status.dart';
@@ -103,10 +105,11 @@ class JournalListScreen extends ConsumerWidget {
                           )
                           .length;
 
-                      return RefreshIndicator.adaptive(
+                      return CharacterRefreshIndicator(
                         onRefresh: () =>
                             ref.read(journalProvider.notifier).refresh(),
                         child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(
                             AppSpacing.lg,
                             AppSpacing.sm,
@@ -170,7 +173,7 @@ class JournalListScreen extends ConsumerWidget {
                             const SizedBox(height: AppSpacing.md),
                             if (entries.isEmpty)
                               Container(
-                                padding: const EdgeInsets.all(AppSpacing.xl),
+                                padding: const EdgeInsets.all(AppSpacing.lg),
                                 decoration: BoxDecoration(
                                   color: colorScheme.surface,
                                   borderRadius: BorderRadius.circular(
@@ -181,9 +184,11 @@ class JournalListScreen extends ConsumerWidget {
                                     width: AppSpacing.hairlineBorder,
                                   ),
                                 ),
-                                child: const Text(
-                                  'Belum ada jurnal.',
-                                  textAlign: TextAlign.center,
+                                child: const AppEmptyCharacter(
+                                  message: 'Belum ada jurnal.',
+                                  assetPath:
+                                      'assets/illustrations/undraw_jurnal.svg',
+                                  imageHeight: 96,
                                 ),
                               )
                             else
