@@ -1,4 +1,4 @@
-name: Build & Release Android APK (Auto-Update)
+name: Build & Release Android APK (Turbo Auto-Update)
 
 on:
   push:
@@ -16,9 +16,18 @@ on:
         required: false
         default: false
         type: boolean
+      run_tests:
+        description: 'Jalankan flutter test sebelum build (matikan untuk rilis kilat)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-android-release:
@@ -48,17 +57,33 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter Stable
+      - name: Setup Gradle Build Cache (Incremental Turbo)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Setup Flutter 3.41.6 (Cached)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.6'
           channel: 'stable'
           cache: true
 
+      - name: Cache Dart & Flutter Incremental Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .dart_tool
+            build/app/intermediates
+          key: flutter-build-${{ runner.os }}-arm64-${{ hashFiles('pubspec.lock', 'android/app/build.gradle.kts') }}
+          restore-keys: |
+            flutter-build-${{ runner.os }}-arm64-
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run tests
+      - name: Run tests (optional)
+        if: ${{ inputs.run_tests == true }}
         run: flutter test
 
       - name: Decode custom Android Keystore (optional override)
@@ -71,7 +96,7 @@ jobs:
             echo "KEYSTORE_PATH=${{ runner.temp }}/release.jks" >> "$GITHUB_ENV"
           fi
 
-      - name: Build Signed Release APK via Gradle
+      - name: Build Signed Release APK (Turbo ARM64 + Gradle Cache)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -82,6 +107,7 @@ jobs:
             API_URL="https://api.fanajalh.id/api/v1"
           fi
           flutter build apk --release \
+            --target-platform android-arm64 \
             --build-name="${{ steps.meta.outputs.version }}" \
             --build-number="${{ steps.meta.outputs.build_number }}" \
             --dart-define="API_BASE_URL=${API_URL}" \
@@ -94,6 +120,7 @@ jobs:
           mkdir -p release-dist
           cp build/app/outputs/flutter-apk/app-release.apk "release-dist/${{ steps.meta.outputs.apk_name }}"
           (cd release-dist && sha256sum "${{ steps.meta.outputs.apk_name }}" > SHA256SUMS.txt)
+          ls -lh release-dist/
           cat release-dist/SHA256SUMS.txt
 
       - name: Publish GitHub Release
@@ -104,7 +131,7 @@ jobs:
           generate_release_notes: true
           body: |
             ${{ inputs.mandatory && '[FORCE]' || '' }}
-            Rilis otomatis Android APK untuk **Absensi PKL** versi `${{ steps.meta.outputs.version }}` (build `${{ steps.meta.outputs.build_number }}`).
+            Rilis otomatis Android APK (`arm64-v8a` Turbo) untuk **Absensi PKL** versi `${{ steps.meta.outputs.version }}` (build `${{ steps.meta.outputs.build_number }}`).
 
             Aplikasi Android yang sudah terpasang akan otomatis mendeteksi pembaruan ini dan menampilkan tombol **Update Sekarang** dengan verifikasi SHA-256.
           files: |
