@@ -1,0 +1,108 @@
+name: Build & Release Android APK (Auto-Update)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (contoh: v1.0.1)'
+        required: true
+        default: 'v1.0.1'
+        type: string
+      mandatory:
+        description: 'Tandai sebagai update wajib ([FORCE])'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: meta
+        shell: bash
+        run: |
+          RAW_TAG="${{ inputs.tag || github.ref_name }}"
+          if [[ "$RAW_TAG" != v* ]]; then
+            RAW_TAG="v${RAW_TAG}"
+          fi
+          CLEAN_VERSION="${RAW_TAG#v}"
+          BUILD_NUM="${{ github.run_number }}"
+          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${BUILD_NUM}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=absensi-pkl-${RAW_TAG}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter Stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Decode custom Android Keystore (optional override)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "${{ runner.temp }}/release.jks"
+          echo "KEYSTORE_PATH=${{ runner.temp }}/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build Signed Release APK via Gradle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          API_URL="${{ secrets.API_BASE_URL }}"
+          if [ -z "$API_URL" ]; then
+            API_URL="https://api.fanajalh.id/api/v1"
+          fi
+          flutter build apk --release \
+            --build-name="${{ steps.meta.outputs.version }}" \
+            --build-number="${{ steps.meta.outputs.build_number }}" \
+            --dart-define="API_BASE_URL=${API_URL}" \
+            --dart-define="GITHUB_REPO=${{ github.repository }}" \
+            --dart-define="AUTO_CHECK_UPDATES=true"
+
+      - name: Prepare Release Artifacts & SHA-256 Checksum
+        shell: bash
+        run: |
+          mkdir -p release-dist
+          cp build/app/outputs/flutter-apk/app-release.apk "release-dist/${{ steps.meta.outputs.apk_name }}"
+          (cd release-dist && sha256sum "${{ steps.meta.outputs.apk_name }}" > SHA256SUMS.txt)
+          cat release-dist/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Absensi PKL ${{ steps.meta.outputs.tag }}"
+          generate_release_notes: true
+          body: |
+            ${{ inputs.mandatory && '[FORCE]' || '' }}
+            Rilis otomatis Android APK untuk **Absensi PKL** versi `${{ steps.meta.outputs.version }}` (build `${{ steps.meta.outputs.build_number }}`).
+
+            Aplikasi Android yang sudah terpasang akan otomatis mendeteksi pembaruan ini dan menampilkan tombol **Update Sekarang** dengan verifikasi SHA-256.
+          files: |
+            release-dist/${{ steps.meta.outputs.apk_name }}
+            release-dist/SHA256SUMS.txt
