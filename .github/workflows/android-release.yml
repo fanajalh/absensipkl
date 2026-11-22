@@ -104,7 +104,7 @@ jobs:
         run: |
           API_URL="${{ secrets.API_BASE_URL }}"
           if [ -z "$API_URL" ]; then
-            API_URL="https://api.fanajalh.id/api/v1"
+            API_URL="https://absensi.allfanajalh.web.id/api/v1"
           fi
           flutter build apk --release \
             --target-platform android-arm64 \

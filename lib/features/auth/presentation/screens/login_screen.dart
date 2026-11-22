@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,6 +8,8 @@ import '../../../../core/errors/app_error.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/motion_widgets.dart';
+import '../../../update/presentation/notifiers/app_update_notifier.dart';
+import '../../../update/presentation/widgets/app_update_sheet.dart';
 import '../../data/datasources/demo_auth_datasource.dart';
 import '../notifiers/auth_notifier.dart';
 import '../notifiers/auth_state.dart';
@@ -26,6 +30,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final FocusNode _identifierFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_checkStartupUpdate());
+    });
+  }
+
+  Future<void> _checkStartupUpdate() async {
+    final hasUpdate =
+        await ref.read(appUpdateProvider.notifier).checkOnStartupIfNeeded();
+    if (!mounted || !hasUpdate) return;
+    final release = ref.read(appUpdateProvider).release;
+    if (release == null) return;
+    await AppUpdateSheet.show(context, isMandatory: release.isMandatory);
+  }
 
   @override
   void dispose() {

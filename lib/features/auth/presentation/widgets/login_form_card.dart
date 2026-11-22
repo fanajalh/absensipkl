@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/testing/app_widget_keys.dart';
@@ -151,21 +150,18 @@ class LoginFormCard extends StatelessWidget {
             },
             onFieldSubmitted: (_) => onSubmit(),
           ),
-          if (kDebugMode) ...<Widget>[
-            const SizedBox(height: AppSpacing.xs),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                key: AppWidgetKeys.loginDemoFillButton,
-                onPressed: isSubmitting ? null : onFillDemo,
-                child: const Text(
-                  'Isi Akun Demo',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: AppWidgetKeys.loginDemoFillButton,
+              onPressed: isSubmitting ? null : onFillDemo,
+              child: const Text(
+                'Isi Akun Demo',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-          ] else
-            const SizedBox(height: AppSpacing.lg),
+          ),
           FilledButton(
             key: AppWidgetKeys.loginSubmitButton,
             onPressed: isSubmitting ? null : onSubmit,
